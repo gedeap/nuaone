@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { comparePassword, signSessionToken, setSessionCookie } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { recordRequestHit } from '@/lib/costProtection';
 import { z } from 'zod';
 
 const loginSchema = z.object({
@@ -10,6 +12,16 @@ const loginSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    recordRequestHit();
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`login:${ip}`, { limit: 5, windowMs: 5 * 60 * 1000 });
+
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak percobaan masuk. Silakan coba kembali dalam 5 menit.' },
+        { status: 429 }
+      );
+    }
     const body = await req.json();
     const result = loginSchema.safeParse(body);
 

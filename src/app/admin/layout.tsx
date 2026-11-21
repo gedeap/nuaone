@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   ExternalLink,
+  Activity,
 } from 'lucide-react';
 
 export default async function AdminLayout({
@@ -79,6 +80,13 @@ export default async function AdminLayout({
             >
               <Settings className="w-4 h-4 text-[#D8C3A5]" />
               <span>PENGATURAN SISTEM</span>
+            </Link>
+            <Link
+              href="/admin/resources"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-[#F8F5F0] hover:bg-[#2A2A2A] transition-colors"
+            >
+              <Activity className="w-4 h-4 text-[#D8C3A5]" />
+              <span>SUMBER DAYA & BIAYA</span>
             </Link>
           </nav>
         </div>

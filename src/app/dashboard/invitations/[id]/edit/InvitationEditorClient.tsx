@@ -17,7 +17,10 @@ import {
   Plus,
   Trash2,
   ExternalLink,
+  UploadCloud,
+  Sparkles,
 } from 'lucide-react';
+import { compressImageToWebP } from '@/lib/imageCompression';
 
 interface Props {
   initialInvitation: any;
@@ -61,6 +64,33 @@ export function InvitationEditorClient({ initialInvitation }: Props) {
   // Status & Theme
   const [status, setStatus] = useState(initialInvitation.status || 'PUBLISHED');
   const [themeStyle, setThemeStyle] = useState(initialInvitation.themeStyle || 'classic');
+
+  // Image compression states
+  const [compressingCover, setCompressingCover] = useState(false);
+  const [compressingClosing, setCompressingClosing] = useState(false);
+  const [coverStats, setCoverStats] = useState<{ orig: number; comp: number; saved: number } | null>(null);
+  const [closingStats, setClosingStats] = useState<{ orig: number; comp: number; saved: number } | null>(null);
+
+  const handleFileUpload = async (file: File, type: 'cover' | 'closing') => {
+    if (type === 'cover') setCompressingCover(true);
+    else setCompressingClosing(true);
+
+    try {
+      const res = await compressImageToWebP(file);
+      if (type === 'cover') {
+        setCoverImage(res.dataUrl);
+        setCoverStats({ orig: res.originalSizeKb, comp: res.compressedSizeKb, saved: res.savingsPercentage });
+      } else {
+        setClosingImage(res.dataUrl);
+        setClosingStats({ orig: res.originalSizeKb, comp: res.compressedSizeKb, saved: res.savingsPercentage });
+      }
+    } catch (err: any) {
+      alert(err.message || 'Gagal mengompresi gambar');
+    } finally {
+      if (type === 'cover') setCompressingCover(false);
+      else setCompressingClosing(false);
+    }
+  };
 
   // Events
   const [events, setEvents] = useState<any[]>(
@@ -609,20 +639,71 @@ export function InvitationEditorClient({ initialInvitation }: Props) {
       {/* Tab 3: Foto Sampul & Galeri */}
       {activeTab === 'media' && (
         <div className="bg-white rounded-2xl border border-[#E9E1D6] p-6 sm:p-8 space-y-6 animate-fade-in">
-          <h3 className="font-serif text-lg font-bold text-[#252525]">
-            Foto Sampul & Media Penutup
-          </h3>
+          <div>
+            <h3 className="font-serif text-lg font-bold text-[#252525]">
+              Foto Sampul & Media Penutup
+            </h3>
+            <p className="text-xs text-[#252525]/60 mt-1">
+              Unggah foto dari perangkat Anda atau masukkan tautan URL. Sistem otomatis mengompresi foto menjadi format WebP &le; 2MB untuk kecepatan akses maksimal.
+            </p>
+          </div>
+
+          {/* WebP Compression Info Badge */}
+          <div className="p-4 rounded-xl bg-[#F8F5F0] border border-[#D8C3A5]/60 flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-[#B59E7B] shrink-0 mt-0.5" />
+            <div className="text-xs text-[#252525]/80 space-y-1">
+              <p className="font-semibold text-[#252525]">
+                Optimalisasi WebP & Hemat Penyimpanan Otomatis
+              </p>
+              <p className="text-[11px] leading-relaxed text-[#252525]/70">
+                Setiap foto yang diunggah akan otomatis di-resize (maks. 1600px) dan dikompresi di browser pengguna ke WebP sebelum disimpan. Ini menjaga kuota Cloudflare R2 tetap gratis ($0) dan mempercepat undangan saat dibuka tamu melalui koneksi seluler.
+              </p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold uppercase text-[#252525]/70">
-                URL Foto Sampul Utama (Cover)
-              </label>
+            {/* Foto Sampul */}
+            <div className="space-y-3 p-4 rounded-xl border border-[#E9E1D6] bg-[#FAFAF8]">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase text-[#252525]/80">
+                  Foto Sampul Utama (Cover)
+                </label>
+                {coverStats && (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                    Hemat {coverStats.saved}% ({coverStats.orig}KB &rarr; {coverStats.comp}KB)
+                  </span>
+                )}
+              </div>
+
+              {/* File upload input */}
+              <div className="flex items-center gap-2">
+                <label className={`cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  compressingCover
+                    ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-white border-[#D8C3A5] text-[#252525] hover:bg-[#F8F5F0]'
+                }`}>
+                  <UploadCloud className="w-4 h-4 text-[#B59E7B]" />
+                  <span>{compressingCover ? 'Mengompresi...' : 'Pilih File (Otomatis WebP)'}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={compressingCover}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'cover');
+                    }}
+                  />
+                </label>
+                <span className="text-[11px] text-[#252525]/40 font-mono">atau URL manual</span>
+              </div>
+
               <input
                 type="text"
                 value={coverImage}
                 onChange={(e) => setCoverImage(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-[#D8C3A5] text-xs bg-[#F8F5F0] focus:outline-none"
+                placeholder="https://... atau data:image/webp..."
+                className="w-full px-3 py-2 rounded-xl border border-[#D8C3A5] text-xs bg-white focus:outline-none"
               />
               {coverImage && (
                 <div className="aspect-[16/9] rounded-xl overflow-hidden bg-gray-100 relative border border-[#E9E1D6]">
@@ -631,15 +712,48 @@ export function InvitationEditorClient({ initialInvitation }: Props) {
               )}
             </div>
 
-            <div className="space-y-3">
-              <label className="block text-xs font-semibold uppercase text-[#252525]/70">
-                URL Foto Penutup (Closing)
-              </label>
+            {/* Foto Penutup */}
+            <div className="space-y-3 p-4 rounded-xl border border-[#E9E1D6] bg-[#FAFAF8]">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase text-[#252525]/80">
+                  Foto Penutup (Closing)
+                </label>
+                {closingStats && (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                    Hemat {closingStats.saved}% ({closingStats.orig}KB &rarr; {closingStats.comp}KB)
+                  </span>
+                )}
+              </div>
+
+              {/* File upload input */}
+              <div className="flex items-center gap-2">
+                <label className={`cursor-pointer flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  compressingClosing
+                    ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed'
+                    : 'bg-white border-[#D8C3A5] text-[#252525] hover:bg-[#F8F5F0]'
+                }`}>
+                  <UploadCloud className="w-4 h-4 text-[#B59E7B]" />
+                  <span>{compressingClosing ? 'Mengompresi...' : 'Pilih File (Otomatis WebP)'}</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={compressingClosing}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file, 'closing');
+                    }}
+                  />
+                </label>
+                <span className="text-[11px] text-[#252525]/40 font-mono">atau URL manual</span>
+              </div>
+
               <input
                 type="text"
                 value={closingImage}
                 onChange={(e) => setClosingImage(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-[#D8C3A5] text-xs bg-[#F8F5F0] focus:outline-none"
+                placeholder="https://... atau data:image/webp..."
+                className="w-full px-3 py-2 rounded-xl border border-[#D8C3A5] text-xs bg-white focus:outline-none"
               />
               {closingImage && (
                 <div className="aspect-[16/9] rounded-xl overflow-hidden bg-gray-100 relative border border-[#E9E1D6]">

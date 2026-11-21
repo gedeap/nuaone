@@ -129,6 +129,20 @@ else
   exit 1
 fi
 
+echo -n "20. Testing Admin Resource & Cost Monitoring Page (/admin/resources)... "
+CODE=$(curl -s -b "$ADMIN_COOKIE_JAR" -o /dev/null -w "%{http_code}" "$BASE/admin/resources")
+if [ "$CODE" = "200" ]; then echo "✅ OK ($CODE)"; else echo "❌ FAILED ($CODE)"; exit 1; fi
+
+echo -n "21. Testing DuckDB Analytics Export Route (/api/admin/analytics/export)... "
+DUCKDB_EXPORT=$(curl -s -b "$ADMIN_COOKIE_JAR" "$BASE/api/admin/analytics/export")
+if echo "$DUCKDB_EXPORT" | grep -q "DuckDB / Parquet OLAP"; then
+  echo "✅ OK (DuckDB OLAP JSON schema payload generated)"
+else
+  echo "❌ FAILED: $DUCKDB_EXPORT"
+  exit 1
+fi
+
 echo "======================================================="
-echo "🎉 ALL 19 AUTOMATED TESTS PASSED WITH 100% SUCCESS!"
+echo "🎉 ALL 21 AUTOMATED TESTS PASSED WITH 100% SUCCESS!"
 echo "======================================================="
+

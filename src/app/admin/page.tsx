@@ -12,7 +12,11 @@ import {
   Clock,
   ArrowRight,
   TrendingUp,
+  Activity,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
+import { getResourceBudgetSummary } from '@/lib/costProtection';
 
 export default async function AdminOverviewPage() {
   const user = await getCurrentUser();
@@ -20,7 +24,7 @@ export default async function AdminOverviewPage() {
     redirect('/login');
   }
 
-  const [usersCount, orders, invitations, recentUsers] = await Promise.all([
+  const [usersCount, orders, invitations, recentUsers, budgetSummary] = await Promise.all([
     prisma.user.count(),
     prisma.order.findMany({
       include: {
@@ -40,6 +44,7 @@ export default async function AdminOverviewPage() {
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
+    getResourceBudgetSummary(),
   ]);
 
   const totalOrders = orders.length;
@@ -50,6 +55,43 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Cloudflare Free Tier Cost Protection Banner */}
+      <div className="p-5 rounded-2xl bg-[#1E1E1E] text-white border border-[#333333] shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+            budgetSummary.status === 'NORMAL' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+            budgetSummary.status === 'WARNING' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+            'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+          }`}>
+            {budgetSummary.status === 'NORMAL' ? <ShieldCheck className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+          </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="font-serif font-bold text-base sm:text-lg text-[#F8F5F0]">
+                Perlindungan Biaya: Cloudflare Free-Tier ($0/Bulan)
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                budgetSummary.status === 'NORMAL' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50' :
+                budgetSummary.status === 'WARNING' ? 'bg-amber-900/60 text-amber-300 border border-amber-700/50' :
+                'bg-rose-900/60 text-rose-300 border border-rose-700/50'
+              }`}>
+                STATUS: {budgetSummary.status} ({budgetSummary.percentageUsed}% PENGGUNAAN)
+              </span>
+            </div>
+            <p className="text-xs text-[#E9E1D6]/70 mt-1">
+              Safety circuit breaker aktif. Kuota request: {budgetSummary.workers.estimatedToday.toLocaleString('id-ID')} / 100.000 req/hari. R2 Media: {budgetSummary.storageMb.estimatedUsed} MB / 10 GB.
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/admin/resources"
+          className="px-4 py-2.5 rounded-xl bg-[#B59E7B] hover:bg-[#A38C69] text-[#252525] font-semibold text-xs tracking-wider transition-colors shrink-0 flex items-center gap-2"
+        >
+          <Activity className="w-4 h-4" />
+          <span>PANTAU SUMBER DAYA</span>
+        </Link>
+      </div>
+
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="p-6 rounded-2xl bg-white border border-[#E9E1D6] shadow-sm space-y-2">

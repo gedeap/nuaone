@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resolveGuestByToken } from '@/lib/guestToken';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { recordRequestHit } from '@/lib/costProtection';
 import { AttendanceStatus } from '@prisma/client';
 import { z } from 'zod';
 
@@ -16,6 +18,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    recordRequestHit();
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`rsvp:${ip}`, { limit: 10, windowMs: 10 * 60 * 1000 });
+
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan RSVP dari perangkat ini. Harap tunggu beberapa saat.' },
+        { status: 429 }
+      );
+    }
     const { id } = await params;
     const body = await req.json();
     const result = rsvpSchema.safeParse(body);

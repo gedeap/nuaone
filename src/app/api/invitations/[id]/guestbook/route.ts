@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { resolveGuestByToken } from '@/lib/guestToken';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { recordRequestHit, isFeatureAllowed } from '@/lib/costProtection';
 import { z } from 'zod';
 
 const guestbookSchema = z.object({
@@ -14,6 +16,24 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    recordRequestHit();
+    const allowed = await isFeatureAllowed('GUESTBOOK_SUBMISSION');
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Buku tamu sedang dalam mode pembatasan sumber daya sementara. Silakan coba kembali nanti.' },
+        { status: 503 }
+      );
+    }
+
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`guestbook:${ip}`, { limit: 5, windowMs: 5 * 60 * 1000 });
+
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: 'Terlalu sering mengirim ucapan. Harap beri jeda 5 menit.' },
+        { status: 429 }
+      );
+    }
     const { id } = await params;
     const body = await req.json();
     const result = guestbookSchema.safeParse(body);

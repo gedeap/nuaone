@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { hashPassword, signSessionToken, setSessionCookie } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { recordRequestHit } from '@/lib/costProtection';
 import { Role, UserStatus } from '@prisma/client';
 import { z } from 'zod';
 
@@ -13,6 +15,16 @@ const registerSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    recordRequestHit();
+    const ip = getClientIp(req);
+    const rateCheck = checkRateLimit(`register:${ip}`, { limit: 3, windowMs: 10 * 60 * 1000 });
+
+    if (!rateCheck.success) {
+      return NextResponse.json(
+        { error: 'Batas pendaftaran tercapai untuk sesi ini. Silakan coba kembali dalam 10 menit.' },
+        { status: 429 }
+      );
+    }
     const body = await req.json();
     const result = registerSchema.safeParse(body);
 
